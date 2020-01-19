@@ -31,7 +31,7 @@ const (
 )
 
 func (n Note) String() string {
-	return fmt.Sprintf("%s note %s %s", n.At.Format("2006-01-02"), n.AccountName, n.Note)
+	return fmt.Sprintf(`%s note %s "%s"`, n.At.Format("2006-01-02"), n.AccountName, n.Note)
 }
 
 func (n Note) node() {}
@@ -65,7 +65,7 @@ func (d *Document) parseAccount(i int, parentStop stopFn) (int, Node, error) {
 			if strings.HasPrefix(a.Name, m[3]) {
 				return 1, Note{
 					AccountName: m[3],
-					Note:        m[4],
+					Note:        strings.Trim(m[4], " \""),
 					At:          open,
 				}, nil
 			}

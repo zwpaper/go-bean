@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/zwpaper/go-bean/parser"
 )
 
@@ -17,7 +16,6 @@ type Bean struct {
 
 type Account struct {
 	Name     string
-	Labels   Label
 	Currency string
 	Children []Account
 	Notes    []string
@@ -49,14 +47,12 @@ type Detail struct {
 // TODO:
 type Accounts []Account
 
-// custom type for account notes, may convenience for later usage
-type Label map[string]string
-
 func Count(f string) (*Bean, error) {
 	file, err := os.Open(f)
 	if err != nil {
 		return nil, fmt.Errorf("open file error: %w", err)
 	}
+	defer file.Close()
 
 	parser := parser.New()
 	doc, err := parser.Parse(file, f)
@@ -65,6 +61,14 @@ func Count(f string) (*Bean, error) {
 	}
 
 	return buildBean(doc)
+}
+
+func (b Bean) AllAccounts() Accounts {
+	return Accounts(b.Accounts)
+}
+
+func (b Bean) AllTransactions() []Transaction {
+	return b.Transactions
 }
 
 func buildBean(doc *parser.Document) (*Bean, error) {
@@ -113,14 +117,6 @@ func buildBean(doc *parser.Document) (*Bean, error) {
 			}
 			bean.Transactions = append(bean.Transactions, t)
 		}
-	}
-
-	for _, a := range bean.Accounts {
-		logrus.Info(a)
-	}
-
-	for _, a := range bean.Transactions {
-		logrus.Info(a)
 	}
 
 	return &bean, nil

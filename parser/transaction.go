@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,7 +22,7 @@ var availableStatus = map[string]struct{}{
 }
 
 func (t Heading) String() string {
-	s := fmt.Sprintf("%s %s %s %s", t.At.Format("2006-01-02"), t.Status, t.Payee, t.Name)
+	s := fmt.Sprintf(`%s %s "%s" "%s"`, t.At.Format("2006-01-02"), t.Status, t.Payee, t.Name)
 	for _, d := range t.Body {
 		s += fmt.Sprintf("\n%s", d)
 	}
@@ -37,7 +38,7 @@ type Body struct {
 }
 
 func (d Body) String() string {
-	return fmt.Sprintf("  %s %+f %s", d.Account, d.Number, d.Currency)
+	return fmt.Sprintf(`  %s %+f %s`, d.Account, d.Number, d.Currency)
 }
 
 func (d Body) node() {}
@@ -57,7 +58,7 @@ func (d *Document) parseHeading(i int, parentStop stopFn) (int, Node, error) {
 		return i, nil, fmt.Errorf("can not parse transaction, not supported status: %s(%v)", m[2], m[0])
 	}
 	tran := Heading{
-		Payee: m[3],
+		Payee: strings.Trim(m[3], "\""),
 		Name:  m[4],
 		// tranStatus type checked in lex
 		Status: m[2],
