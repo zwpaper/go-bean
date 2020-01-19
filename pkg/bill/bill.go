@@ -1,4 +1,4 @@
-package billparser
+package bill
 
 import "time"
 
@@ -19,6 +19,7 @@ type Parser interface {
 type Transaction interface {
 	Payer() string
 	Payee() string
+	Title() string
 	Amount() float64
 	Kind() string
 	At() time.Time
