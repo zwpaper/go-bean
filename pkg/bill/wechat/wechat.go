@@ -14,21 +14,10 @@ import (
 type bill struct {
 	start        time.Time
 	end          time.Time
-	transactions []transaction
+	transactions []ibill.Transaction
 }
 
-type transaction struct {
-	at     time.Time
-	payer  string
-	payee  string
-	title  string
-	amount float64
-	kind   string
-
-	raw string
-}
-
-func (b bill) Transactions() ([]transaction, error) {
+func (b bill) Transactions() ([]ibill.Transaction, error) {
 	return b.transactions, nil
 }
 
@@ -38,7 +27,7 @@ func (b bill) Range() (time.Time, time.Time) {
 
 func New(f io.Reader) (*bill, error) {
 	b := bill{
-		transactions: make([]transaction, 0),
+		transactions: make([]ibill.Transaction, 0),
 	}
 
 	header := false
@@ -79,17 +68,13 @@ func New(f io.Reader) (*bill, error) {
 	return &b, nil
 }
 
-func (b *bill) parseLine(fields []string) error {
-	return nil
-}
-
 func (b *bill) parseRange(fields []string) error {
 	return nil
 }
 
-func (b *bill) parseTransaction(fields []string, hi map[string]int) (transaction, error) {
-	t := transaction{
-		raw: strings.Join(fields, ","),
+func (b *bill) parseTransaction(fields []string, hi map[string]int) (ibill.Transaction, error) {
+	t := ibill.Transaction{
+		Raw: strings.Join(fields, ","),
 	}
 	var ok bool
 	var index int
@@ -102,26 +87,26 @@ func (b *bill) parseTransaction(fields []string, hi map[string]int) (transaction
 	}
 
 	if index, ok = getIndex("商品"); ok {
-		t.title = fields[index]
+		t.Title = fields[index]
 	} else {
 		return t, fmt.Errorf("title not found, in bill")
 	}
 	if index, ok = getIndex("交易对方"); ok {
 		if fields[index] == "/" {
-			t.payee = "零钱"
+			t.Payee = "零钱"
 		}
-		t.payee = fields[index]
+		t.Payee = fields[index]
 	} else {
 		return t, fmt.Errorf("payee not found, in bill")
 	}
 	if index, ok = getIndex("支付方式"); ok {
-		t.payer = fields[index]
+		t.Payer = fields[index]
 	} else {
 		return t, fmt.Errorf("payer not found, in bill")
 	}
 	if index, ok = getIndex("交易时间"); ok {
 		var err error
-		t.at, err = time.Parse("2006-01-02 15:04:05", fields[index])
+		t.At, err = time.Parse("2006-01-02 15:04:05", fields[index])
 		if err != nil {
 			return t, fmt.Errorf("transaction time err: %w", err)
 		}
@@ -131,13 +116,13 @@ func (b *bill) parseTransaction(fields []string, hi map[string]int) (transaction
 	if index, ok = getIndex("收/支"); ok {
 		switch fields[index] {
 		case "支出":
-			t.kind = ibill.TransKindPay
+			t.Kind = ibill.TransKindPay
 		case "收入":
-			t.kind = ibill.TransKindIncome
+			t.Kind = ibill.TransKindIncome
 		case "转账":
-			t.kind = ibill.TransKindTransfer
+			t.Kind = ibill.TransKindTransfer
 		case "微信红包-退款":
-			t.kind = ibill.TransKindRefund
+			t.Kind = ibill.TransKindRefund
 		default:
 			return t, fmt.Errorf("%s not recognize", fields[index])
 		}
@@ -146,8 +131,12 @@ func (b *bill) parseTransaction(fields []string, hi map[string]int) (transaction
 	}
 	if index, ok = getIndex("金额(元)"); ok {
 		// TODO: currency
+		switch ([]rune(fields[index]))[0] {
+		case '¥':
+			t.Currency = ibill.CurrencyCNY
+		}
 		var err error
-		t.amount, err = strconv.ParseFloat(string([]rune(fields[index])[1:]), 64)
+		t.Amount, err = strconv.ParseFloat(string([]rune(fields[index])[1:]), 64)
 		if err != nil {
 			return t, fmt.Errorf("amount err: %w", err)
 		}

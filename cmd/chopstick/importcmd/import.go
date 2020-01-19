@@ -10,31 +10,23 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/zwpaper/go-bean"
-	"github.com/zwpaper/go-bean/pkg/billparser/wechat"
+	"github.com/zwpaper/go-bean/pkg/bill"
+	"github.com/zwpaper/go-bean/pkg/bill/wechat"
 	"github.com/zwpaper/go-bean/pkg/config"
+	"github.com/zwpaper/go-bean/pkg/formatter/beancount"
 )
 
 type importer struct {
-	accounts map[string]account
-	payee    map[string]payee
-	bill     io.ReadCloser
-	billKind string
-}
-
-type account struct {
-	Name  string
-	alias map[string]struct{}
-}
-
-type payee struct {
-	Name     string
-	accounts []string
+	accountAlias  map[string]string
+	payeeAccounts map[string][]string
+	bill          io.ReadCloser
+	billKind      string
 }
 
 func NewCommand(c *config.Config) *cobra.Command {
 	imp := &importer{
-		accounts: make(map[string]account),
-		payee:    make(map[string]payee),
+		accountAlias:  make(map[string]string),
+		payeeAccounts: make(map[string][]string),
 	}
 	command := &cobra.Command{
 		Use:   "import",
@@ -63,14 +55,25 @@ func NewCommand(c *config.Config) *cobra.Command {
 			}
 			err = imp.parseBean(bean)
 			if err != nil {
-				logrus.Error("parse error: ", err)
+				logrus.Error("parse bean error: ", err)
 				os.Exit(1)
 			}
-			err = imp.parseBill()
+			bp, err := imp.parseBill()
 			if err != nil {
-				logrus.Error("parse error: ", err)
+				logrus.Error("parse bill error: ", err)
 				os.Exit(1)
 			}
+			ts, err := bp.Transactions()
+			if err != nil {
+				logrus.Error("transactions error: ", err)
+				os.Exit(1)
+			}
+			tally, err := imp.createTally(ts)
+			if err != nil {
+				logrus.Error("crate tally error: ", err)
+				os.Exit(1)
+			}
+			fmt.Println(tally)
 		},
 		PostRun: func(cmd *cobra.Command, args []string) {
 			if imp.bill != nil {
@@ -99,13 +102,10 @@ func build(l *importer, cmd *cobra.Command) error {
 	return nil
 }
 
+// update importer directly
 func (i importer) parseBean(b *bean.Bean) error {
 	// parse account
 	for _, a := range b.AllAccounts() {
-		created := account{
-			Name: a.Name,
-		}
-		alias := make(map[string]struct{})
 		for _, n := range a.Notes {
 			nl := strings.Split(n, ":")
 			if len(nl) != 3 ||
@@ -113,22 +113,32 @@ func (i importer) parseBean(b *bean.Bean) error {
 				strings.ToLower(nl[1]) != i.billKind {
 				continue
 			}
-			alias[nl[2]] = struct{}{}
+			i.accountAlias[nl[2]] = a.Name
 		}
-		created.alias = alias
-		i.accounts[created.Name] = created
 	}
 
 	// parse payee
+	payeeMap := map[string]map[string]struct{}{}
 	for _, t := range b.AllTransactions() {
-		created := payee{
-			Name:     t.Payee,
-			accounts: make([]string, 0),
+		as, ok := payeeMap[t.Payee]
+		if !ok {
+			as = make(map[string]struct{})
 		}
 		for _, d := range t.Details {
-			created.accounts = append(created.accounts, d.Account.Name)
+			// only add + account as beans go into this payee
+			if d.Number > 0 {
+				as[d.Account.Name] = struct{}{}
+			}
 		}
-		i.payee[created.Name] = created
+		payeeMap[t.Payee] = as
+	}
+
+	for n, am := range payeeMap {
+		as := make([]string, 0)
+		for a := range am {
+			as = append(as, a)
+		}
+		i.payeeAccounts[n] = as
 	}
 
 	return nil
@@ -143,16 +153,38 @@ const (
 	// aliPay billKind = "alipay"
 )
 
-func (i importer) parseBill() error {
+func (i importer) parseBill() (bill.Parser, error) {
 	switch i.billKind {
 	case billKindWechat:
 		p, err := wechat.New(i.bill)
 		if err != nil {
-			return fmt.Errorf("parser wechat bill error: %w", err)
+			return nil, fmt.Errorf("parser wechat bill error: %w", err)
 		}
-		fmt.Println(p.Transactions())
+		return p, nil
 	default:
-		return fmt.Errorf("bill kind %s not supported", i.billKind)
+		return nil, fmt.Errorf("bill kind %s not supported", i.billKind)
 	}
-	return nil
+}
+
+func (i importer) createTally(ts []bill.Transaction) (string, error) {
+	beanformat := beancount.New()
+
+	var tally string
+	for _, t := range ts {
+		var accs []string
+		as, _ := i.payeeAccounts[t.Payee]
+		acc, ok := i.accountAlias[t.Payer]
+		if ok {
+			accs = []string{acc}
+		}
+
+		s, err := beanformat.CreateTransaction(t, as, accs)
+		if err != nil {
+			return "", err
+		}
+		tally += fmt.Sprintf("\n%s", s)
+	}
+
+	fmt.Println(tally)
+	return tally, nil
 }
