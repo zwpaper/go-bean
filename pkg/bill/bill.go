@@ -2,13 +2,11 @@ package bill
 
 import "time"
 
-type TransKind string
-
 const (
-	Pay      TransKind = "pay"
-	Transfer TransKind = "transfer"
-	Income   TransKind = "income"
-	Refund   TransKind = "refund"
+	TransKindPay      = "pay"
+	TransKindTransfer = "transfer"
+	TransKindIncome   = "income"
+	TransKindRefund   = "refund"
 )
 
 type Parser interface {

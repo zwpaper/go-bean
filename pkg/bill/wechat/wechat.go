@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	ibill "github.com/zwpaper/go-bean/pkg/bill"
 )
 
 type bill struct {
@@ -75,8 +76,6 @@ func New(f io.Reader) (*bill, error) {
 		return nil, err
 	}
 
-	logrus.Error(b)
-
 	return &b, nil
 }
 
@@ -89,7 +88,9 @@ func (b *bill) parseRange(fields []string) error {
 }
 
 func (b *bill) parseTransaction(fields []string, hi map[string]int) (transaction, error) {
-	t := transaction{}
+	t := transaction{
+		raw: strings.Join(fields, ","),
+	}
 	var ok bool
 	var index int
 	getIndex := func(name string) (int, bool) {
@@ -104,6 +105,54 @@ func (b *bill) parseTransaction(fields []string, hi map[string]int) (transaction
 		t.title = fields[index]
 	} else {
 		return t, fmt.Errorf("title not found, in bill")
+	}
+	if index, ok = getIndex("交易对方"); ok {
+		if fields[index] == "/" {
+			t.payee = "零钱"
+		}
+		t.payee = fields[index]
+	} else {
+		return t, fmt.Errorf("payee not found, in bill")
+	}
+	if index, ok = getIndex("支付方式"); ok {
+		t.payer = fields[index]
+	} else {
+		return t, fmt.Errorf("payer not found, in bill")
+	}
+	if index, ok = getIndex("交易时间"); ok {
+		var err error
+		t.at, err = time.Parse("2006-01-02 15:04:05", fields[index])
+		if err != nil {
+			return t, fmt.Errorf("transaction time err: %w", err)
+		}
+	} else {
+		return t, fmt.Errorf("transaction time not found, in bill")
+	}
+	if index, ok = getIndex("收/支"); ok {
+		switch fields[index] {
+		case "支出":
+			t.kind = ibill.TransKindPay
+		case "收入":
+			t.kind = ibill.TransKindIncome
+		case "转账":
+			t.kind = ibill.TransKindTransfer
+		case "微信红包-退款":
+			t.kind = ibill.TransKindRefund
+		default:
+			return t, fmt.Errorf("%s not recognize", fields[index])
+		}
+	} else {
+		return t, fmt.Errorf("transaction time not found, in bill")
+	}
+	if index, ok = getIndex("金额(元)"); ok {
+		// TODO: currency
+		var err error
+		t.amount, err = strconv.ParseFloat(string([]rune(fields[index])[1:]), 64)
+		if err != nil {
+			return t, fmt.Errorf("amount err: %w", err)
+		}
+	} else {
+		return t, fmt.Errorf("amount time not found, in bill")
 	}
 
 	return t, nil
