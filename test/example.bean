@@ -1,0 +1,43 @@
+;; -*- mode: org; mode: beancount; coding: utf-8; fill-column: 40; -*-
+
+option "title" "Example Ledger"
+option "operating_currency" "CNY"
+option "operating_currency" "USD"
+
+2016-07-07 open Equity:Opening-Balances
+
+2016-07-07 open Assets:Bank:CMB:1111:Deposit CNY
+2016-07-07 open Assets:WeChat CNY
+2016-07-07 note Assets:WeChat "wechat:account"
+2016-07-07 open Assets:ZhiFuBao CNY
+
+2016-07-07 open Liabilities:Credit:CMB CNY,USD
+2016-07-07 open Liabilities:Huabei CNY
+
+2018-10-30 open Income:Salary CNY
+2016-07-07 open Income:PnL CNY
+2016-07-07 note Income:PnL "ProfileandLean"
+
+2016-07-07 open Expenses:Gov:IncomeTax CNY
+
+2016-07-07 open Expenses:House:Rent CNY
+2016-07-07 open Expenses:Daily:Food CNY
+2016-07-07 open Expenses:Daily:Software CNY
+2016-07-07 open Expenses:Daily:Electronic CNY
+
+;; Details Start
+
+; open balance
+2016-07-07 pad Assets:Bank:CMB:1111:Deposit Equity:Opening-Balances
+
+2019-07-31 * "Company" "Salary"
+  Income:Salary                   -1000 CNY
+  Expenses:Gov:IncomeTax          +99.9 CNY
+  Assets:Bank:CMB:1111:Deposit   +900.1 CNY
+
+; open balance
+2019-08-10 balance Assets:Bank:CMB:1111:Deposit     900.1 CNY
+
+2018-12-14 ! "Jingdong" "milk" #Life
+  Expenses:Daily:Food                                +100 CNY
+  Assets:Bank:CMB:1111:Deposit                       -100 CNY
