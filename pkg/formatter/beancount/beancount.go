@@ -33,7 +33,7 @@ func (f *formatter) AddAccount(name string, account string) error {
 }
 
 const transactionTpl = `;; {{.Raw}}
-{{.At}} ! {{.Payee}} {{.Title}}
+{{.At}} ! "{{.Payee}}" "{{.Title}}"
 {{- with $item := . -}}
   {{- with $ps := $item.PayeeAccounts -}}
 	{{- range $i, $el := $ps}}

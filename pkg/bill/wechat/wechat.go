@@ -87,7 +87,7 @@ func (b *bill) parseTransaction(fields []string, hi map[string]int) (ibill.Trans
 	}
 
 	if index, ok = getIndex("商品"); ok {
-		t.Title = fields[index]
+		t.Title = strings.Trim(fields[index], "\"")
 	} else {
 		return t, fmt.Errorf("title not found, in bill")
 	}
@@ -119,12 +119,14 @@ func (b *bill) parseTransaction(fields []string, hi map[string]int) (ibill.Trans
 			t.Kind = ibill.TransKindPay
 		case "收入":
 			t.Kind = ibill.TransKindIncome
+		case "/":
+			fallthrough
 		case "转账":
 			t.Kind = ibill.TransKindTransfer
 		case "微信红包-退款":
 			t.Kind = ibill.TransKindRefund
 		default:
-			return t, fmt.Errorf("%s not recognize", fields[index])
+			return t, fmt.Errorf("%s not recognize", fields)
 		}
 	} else {
 		return t, fmt.Errorf("transaction time not found, in bill")

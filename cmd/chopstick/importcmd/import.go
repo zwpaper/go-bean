@@ -172,19 +172,24 @@ func (i importer) createTally(ts []bill.Transaction) (string, error) {
 	var tally string
 	for _, t := range ts {
 		var accs []string
-		as, _ := i.payeeAccounts[t.Payee]
+		var accountPayee []string
+		if as, ok := i.accountAlias[t.Payee]; ok {
+			accountPayee = []string{as}
+		} else {
+			// check nil in CreateTransaction
+			accountPayee, _ = i.payeeAccounts[t.Payee]
+		}
 		acc, ok := i.accountAlias[t.Payer]
 		if ok {
 			accs = []string{acc}
 		}
 
-		s, err := beanformat.CreateTransaction(t, as, accs)
+		s, err := beanformat.CreateTransaction(t, accountPayee, accs)
 		if err != nil {
 			return "", err
 		}
 		tally += fmt.Sprintf("\n%s", s)
 	}
 
-	fmt.Println(tally)
 	return tally, nil
 }
